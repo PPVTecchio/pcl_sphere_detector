@@ -7,6 +7,7 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   sensor_msgs
   geometry_msgs
+  std_msgs
 )
 
 find_package(PCL REQUIRED)
@@ -14,7 +15,7 @@ find_package(PCL REQUIRED)
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES pcl_sphere_detector
- CATKIN_DEPENDS pcl_conversions pcl_ros roscpp sensor_msgs
+ CATKIN_DEPENDS pcl_conversions pcl_ros roscpp sensor_msgs geometry_msgs std_msgs
  DEPENDS EIGEN3 PCL
 )
 
