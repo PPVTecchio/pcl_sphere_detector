@@ -4,9 +4,14 @@
 
 #include <Eigen/Dense>
 
+// ROS specific includes
 #include <ros/ros.h>
-// PCL specific includes
+#include <ros/time.h>
 #include <sensor_msgs/PointCloud2.h>
+#include <std_msgs/Header.h>
+#include <geometry_msgs/PointStamped.h>
+
+// PCL specific includes
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
@@ -24,11 +29,9 @@
 #include <pcl/filters/extract_indices.h>
 
 
+ros::Publisher pubPointCloud;
+ros::Publisher pubPointStamped;
 
-
-ros::Publisher pub1;
-ros::Publisher pub2;
-ros::Publisher pub3;
 float min_radius = 0.49;
 float max_radius = 0.51;
 
@@ -68,17 +71,13 @@ void cloud_cb(const sensor_msgs::PointCloud2& cloud_msg) {
   passThroughFilter.setFilterLimits(-10, 10);
   passThroughFilter.filter(*cloudFilteredPtr);
 
-  sensor_msgs::PointCloud2 output3Msg;
-  pcl::toROSMsg(*cloudFilteredPtr, output3Msg);
-  pub3.publish(output3Msg);
+  Eigen::VectorXf modelCoefficientsSphere;
+  std::vector<int> inliersSphere;
 
   // pcl::SampleConsensusModelSphere<pcl::PointXYZ>::Ptr
   //   modelSphere(
   //     new pcl::SampleConsensusModelSphere<pcl::PointXYZ> (cloudFilteredPtr));
   // modelSphere->setRadiusLimits(0.47, 0.53);
-
-  Eigen::VectorXf modelCoefficientsSphere;
-  std::vector<int> inliersSphere;
 
   // pcl::RandomSampleConsensus<pcl::PointXYZ> ransacSphere(modelSphere);
   // ransacSphere.setDistanceThreshold(0.01);
@@ -86,8 +85,6 @@ void cloud_cb(const sensor_msgs::PointCloud2& cloud_msg) {
   // ransacSphere.computeModel();
   // ransacSphere.getModelCoefficients(modelCoefficientsSphere);
   // ransacSphere.getInliers(inliersSphere);
-
-
 
   pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> ne;
   pcl::search::KdTree<pcl::PointXYZ>::Ptr
@@ -119,15 +116,30 @@ void cloud_cb(const sensor_msgs::PointCloud2& cloud_msg) {
   pcl::PointCloud<pcl::PointXYZ>::Ptr
     outputSpherePtr(new pcl::PointCloud<pcl::PointXYZ>);
 
-
   if (modelCoefficientsSphere[3] <= max_radius &
       modelCoefficientsSphere[3] >= min_radius &
       inliersSphere.size() > 70) {
+
     pcl::copyPointCloud(*cloudFilteredPtr, inliersSphere, *outputSpherePtr);
 
-    sensor_msgs::PointCloud2 output1Msg;
-    pcl::toROSMsg(*outputSpherePtr, output1Msg);
-    pub1.publish(output1Msg);
+    sensor_msgs::PointCloud2 outputPointCloudMsg;
+    pcl::toROSMsg(*outputSpherePtr, outputPointCloudMsg);
+    pubPointCloud.publish(outputPointCloudMsg);
+
+    // cloud_msg.header.frame_id
+
+    std_msgs::Header outputHeaderMsg;
+    outputHeaderMsg.seq = cloud_msg.header.seq;
+    outputHeaderMsg.stamp = ros::Time::now();
+    outputHeaderMsg.frame_id = cloud_msg.header.frame_id;
+
+    geometry_msgs::PointStamped outputPointStampedMsg;
+    outputPointStampedMsg.header = outputHeaderMsg;
+    outputPointStampedMsg.point.x = modelCoefficientsSphere[0];
+    outputPointStampedMsg.point.y = modelCoefficientsSphere[1];
+    outputPointStampedMsg.point.z = modelCoefficientsSphere[2];
+
+    pubPointStamped.publish(outputPointStampedMsg);
   }
 }
 
@@ -140,9 +152,10 @@ int main(int argc, char** argv) {
   ros::Subscriber sub = nh.subscribe("velodyne_points", 1, cloud_cb);
 
   // Create a ROS publisher for the output point cloud
-  pub1 = nh.advertise<sensor_msgs::PointCloud2> ("output1", 1);
-  pub2 = nh.advertise<sensor_msgs::PointCloud2> ("output2", 1);
-  pub3 = nh.advertise<sensor_msgs::PointCloud2> ("output3", 1);
+  pubPointCloud = nh.advertise<sensor_msgs::PointCloud2>
+    ("pcl_sphere_detector/point_cloud", 1);
+  pubPointStamped = nh.advertise<geometry_msgs::PointStamped>
+    ("pcl_sphere_detector/sphere_center", 1);
 
   // Spin
   ros::spin();
