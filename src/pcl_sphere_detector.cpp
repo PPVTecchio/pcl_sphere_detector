@@ -109,9 +109,9 @@ void cloud_cb(const sensor_msgs::PointCloud2& cloud_msg) {
   ransacSphere.getModelCoefficients(modelCoefficientsSphere);
   ransacSphere.getInliers(inliersSphere);
 
-  ROS_INFO_STREAM("Sphere RANSAC max it: " << ransacSphere.getMaxIterations());
-  ROS_INFO_STREAM("Sphere model coeff: " << modelCoefficientsSphere);
-  ROS_INFO_STREAM("Sphere # inliers: " << inliersSphere.size());
+  // ROS_INFO_STREAM("Sphere RANSAC max it: " << ransacSphere.getMaxIterations());
+  // ROS_INFO_STREAM("Sphere model coeff: " << modelCoefficientsSphere);
+  // ROS_INFO_STREAM("Sphere # inliers: " << inliersSphere.size());
 
   pcl::PointCloud<pcl::PointXYZ>::Ptr
     outputSpherePtr(new pcl::PointCloud<pcl::PointXYZ>);
@@ -125,8 +125,6 @@ void cloud_cb(const sensor_msgs::PointCloud2& cloud_msg) {
     sensor_msgs::PointCloud2 outputPointCloudMsg;
     pcl::toROSMsg(*outputSpherePtr, outputPointCloudMsg);
     pubPointCloud.publish(outputPointCloudMsg);
-
-    // cloud_msg.header.frame_id
 
     std_msgs::Header outputHeaderMsg;
     outputHeaderMsg.seq = cloud_msg.header.seq;
