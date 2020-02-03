@@ -31,6 +31,7 @@
 
 ros::Publisher pubPointCloud;
 ros::Publisher pubPointStamped;
+ros::Publisher pubFilteredCloud;
 
 float min_radius = 0.49;
 float max_radius = 0.51;
@@ -47,16 +48,16 @@ void cloud_cb(const sensor_msgs::PointCloud2& cloud_msg) {
     cloudFilteredPtr(new pcl::PointCloud<pcl::PointXYZ>);
 
   pcl::VoxelGrid<pcl::PointXYZ> voxelFilter;
-  // voxelFilter.setInputCloud(cloudPtr);
-  // voxelFilter.setLeafSize(0.5, 0.5, 0.5);
-  // voxelFilter.filter(*cloudFilteredPtr);
+  voxelFilter.setInputCloud(cloudPtr);
+  voxelFilter.setLeafSize(0.1, 0.1, 0.1);
+  voxelFilter.filter(*cloudFilteredPtr);
 
   // sensor_msgs::PointCloud2 output2Msg;
   // pcl::toROSMsg(*cloudFilteredPtr, output2Msg);
   // pub2.publish(output2Msg);
 
   pcl::PassThrough<pcl::PointXYZ>  passThroughFilter;
-  passThroughFilter.setInputCloud(cloudPtr);
+  passThroughFilter.setInputCloud(cloudFilteredPtr);
   passThroughFilter.setFilterFieldName("z");
   passThroughFilter.setFilterLimits(-0.5, 2);
   passThroughFilter.filter(*cloudFilteredPtr);
@@ -70,6 +71,10 @@ void cloud_cb(const sensor_msgs::PointCloud2& cloud_msg) {
   passThroughFilter.setFilterFieldName("y");
   passThroughFilter.setFilterLimits(-10, 10);
   passThroughFilter.filter(*cloudFilteredPtr);
+
+  sensor_msgs::PointCloud2 outputFilteredCloudMsg;
+  pcl::toROSMsg(*cloudFilteredPtr, outputFilteredCloudMsg);
+  pubFilteredCloud.publish(outputFilteredCloudMsg);
 
   Eigen::VectorXf modelCoefficientsSphere;
   std::vector<int> inliersSphere;
@@ -116,12 +121,13 @@ void cloud_cb(const sensor_msgs::PointCloud2& cloud_msg) {
   pcl::PointCloud<pcl::PointXYZ>::Ptr
     outputSpherePtr(new pcl::PointCloud<pcl::PointXYZ>);
 
+
+
   if (modelCoefficientsSphere[3] <= max_radius &
       modelCoefficientsSphere[3] >= min_radius &
-      inliersSphere.size() > 70) {
+      inliersSphere.size() > 50) {
 
     pcl::copyPointCloud(*cloudFilteredPtr, inliersSphere, *outputSpherePtr);
-
     sensor_msgs::PointCloud2 outputPointCloudMsg;
     pcl::toROSMsg(*outputSpherePtr, outputPointCloudMsg);
     pubPointCloud.publish(outputPointCloudMsg);
@@ -130,6 +136,7 @@ void cloud_cb(const sensor_msgs::PointCloud2& cloud_msg) {
     outputHeaderMsg.seq = cloud_msg.header.seq;
     outputHeaderMsg.stamp = ros::Time::now();
     outputHeaderMsg.frame_id = cloud_msg.header.frame_id;
+
 
     geometry_msgs::PointStamped outputPointStampedMsg;
     outputPointStampedMsg.header = outputHeaderMsg;
@@ -154,6 +161,9 @@ int main(int argc, char** argv) {
     ("pcl_sphere_detector/point_cloud", 1);
   pubPointStamped = nh.advertise<geometry_msgs::PointStamped>
     ("pcl_sphere_detector/sphere_center", 1);
+
+  pubFilteredCloud = nh.advertise<sensor_msgs::PointCloud2>
+    ("pcl_sphere_detector/filtered_cloud", 1);
 
   // Spin
   ros::spin();
